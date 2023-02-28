@@ -39,6 +39,7 @@ func (e errUnsupportedResource) Error() string {
 }
 
 func (p *pluginProviderServer) GetProviderSchema(ctx context.Context, req *tfprotov5.GetProviderSchemaRequest) (*tfprotov5.GetProviderSchemaResponse, error) {
+	fmt.Println("hello")
 	return &tfprotov5.GetProviderSchemaResponse{
 		Provider:          p.providerSchema,
 		ProviderMeta:      p.providerMetaSchema,
@@ -48,7 +49,11 @@ func (p *pluginProviderServer) GetProviderSchema(ctx context.Context, req *tfpro
 }
 
 func (p *pluginProviderServer) PrepareProviderConfig(ctx context.Context, req *tfprotov5.PrepareProviderConfigRequest) (*tfprotov5.PrepareProviderConfigResponse, error) {
-	return nil, nil
+	rs := tfprotov5.PrepareProviderConfigResponse{
+		PreparedConfig: nil,
+		Diagnostics:    make([]*tfprotov5.Diagnostic, 0),
+	}
+	return &rs, nil
 }
 
 func (p *pluginProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov5.ConfigureProviderRequest) (*tfprotov5.ConfigureProviderResponse, error) {
@@ -146,8 +151,8 @@ func PluginProviderServer() tfprotov5.ProviderServer {
 	dataSourceRouter := make(map[string]func() tfprotov5.DataSourceServer)
 	// in here we include the resources we want to add to dataSourceSchema and router
 
-	dataSourceSchemas["enciso_dummy"] = data_dummy.GetDataDummyLowLevelSchema()
-	dataSourceRouter["enciso_dummy"] = data_dummy.NewDataSourceDummy
+	dataSourceSchemas["provider_dummy"] = data_dummy.GetDataDummyLowLevelSchema()
+	dataSourceRouter["provider_dummy"] = data_dummy.NewDataSourceDummy
 
 	return &pluginProviderServer{
 		providerSchema: &tfprotov5.Schema{

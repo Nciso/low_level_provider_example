@@ -38,7 +38,7 @@ func GetDataDummyLowLevelSchema() *tfprotov5.Schema {
 					Computed: true,
 				},
 				{
-					Name:     "regular_atttribute",
+					Name:     "regular_attribute",
 					Type:     tftypes.String,
 					Optional: true,
 				},
@@ -51,11 +51,17 @@ func GetDataDummyLowLevelSchema() *tfprotov5.Schema {
 			BlockTypes: []*tfprotov5.SchemaNestedBlock{
 				{
 					TypeName: "dynamic_block",
+					Nesting:  tfprotov5.SchemaNestedBlockNestingModeList,
 					Block: &tfprotov5.SchemaBlock{
 						Attributes: []*tfprotov5.SchemaAttribute{
 							{
-								Name:     "dynamic_block",
+								Name:     "bar",
 								Type:     tftypes.DynamicPseudoType,
+								Optional: true,
+							},
+							{
+								Name:     "foo",
+								Type:     tftypes.Number,
 								Optional: true,
 							},
 						},
@@ -63,6 +69,7 @@ func GetDataDummyLowLevelSchema() *tfprotov5.Schema {
 				},
 				{
 					TypeName: "regular_block",
+					Nesting:  tfprotov5.SchemaNestedBlockNestingModeList,
 					Block: &tfprotov5.SchemaBlock{
 						Attributes: []*tfprotov5.SchemaAttribute{
 							{
@@ -90,6 +97,7 @@ type dataSourceDummy struct {
 	// this struct can carry important elements for usage in the lifecycle, in this case the sdk is not needed
 	// because we are not accessing anything from it
 	// Leaving this as reference for the future
+	//nolint:golint,unused
 	autocloudClient interface{}
 }
 
@@ -102,34 +110,84 @@ func (d dataSourceDummy) ReadDataSource(ctx context.Context, req *tfprotov5.Read
 	if !ok {
 		return nil, errors.New("Cant get lowlevel attributes")
 	}
+
+	/*
+		// used as backup to read the dynamic value
+		config := map[string]tftypes.Type{
+			"id":                tftypes.String,
+			"dynamic_attribute": tftypes.DynamicPseudoType,
+			"dynamic_block": tftypes.List{
+				ElementType: tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+					"bar": tftypes.DynamicPseudoType,
+					"foo": tftypes.Number,
+				}},
+			},
+			"regular_attribute": tftypes.String,
+			"regular_block": tftypes.List{
+				ElementType: tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+					"bar": tftypes.String,
+					"foo": tftypes.Number,
+				}},
+			},
+		}
+		//objTypeDef.AttributeTypes["dynamic_block"] = objTypeDef.AttributeTypes["regular_block"]
+	*/
 	values, err := req.Config.Unmarshal(tftypes.Object{
-		AttributeTypes: objTypeDef.AttributeTypes,
+		AttributeTypes: objTypeDef.AttributeTypes, // or config
 	})
 	if err != nil {
 		return nil, fmt.Errorf("Cant unmarshall config input, %v", err.Error())
 	}
 
-	var input dataDummyState
+	var input DataDummyState
 	err = values.As(&input)
 	if err != nil {
 		return nil, fmt.Errorf("Cant convert config input, %v", err.Error())
 	}
 
+	outputObjectType := map[string]tftypes.Type{
+		"bar": tftypes.String,
+		"foo": tftypes.Number,
+	}
+
 	state, err := tfprotov5.NewDynamicValue(
 		objTypeDef,
 		tftypes.NewValue(tftypes.Object{
-			AttributeTypes: objTypeDef.AttributeTypes,
+			AttributeTypes: objTypeDef.AttributeTypes, // or config
 		}, map[string]tftypes.Value{
-			"id":               tftypes.NewValue(tftypes.String, strconv.FormatInt(time.Now().Unix(), 10)),
-			"source":           tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{"hello": tftypes.NewValue(tftypes.String, "world")}),
-			"config":           tftypes.NewValue(tftypes.String, "jsonFormShape"),
-			"blueprint_config": tftypes.NewValue(tftypes.String, "pretty"),
-			"variable":         tftypes.NewValue(objTypeDef.AttributeTypes["variable"], []tftypes.Value{}),
-			"omit_variables":   tftypes.NewValue(objTypeDef.AttributeTypes["omit_variables"], []tftypes.Value{}),
-		}))
+			"id": tftypes.NewValue(tftypes.String, strconv.FormatInt(time.Now().Unix(), 10)),
+			"dynamic_block": tftypes.NewValue(tftypes.List{ElementType: tftypes.Object{AttributeTypes: outputObjectType}},
+
+				[]tftypes.Value{
+					tftypes.NewValue(tftypes.Object{AttributeTypes: outputObjectType},
+						map[string]tftypes.Value{
+							"bar": tftypes.NewValue(tftypes.String, "hello world regular"),
+							"foo": tftypes.NewValue(tftypes.Number, 101),
+						},
+					),
+				},
+			),
+			"regular_block": tftypes.NewValue(tftypes.List{ElementType: tftypes.Object{AttributeTypes: outputObjectType}},
+
+				[]tftypes.Value{
+					tftypes.NewValue(tftypes.Object{AttributeTypes: outputObjectType},
+						map[string]tftypes.Value{
+							"bar": tftypes.NewValue(tftypes.String, "hello world regular"),
+							"foo": tftypes.NewValue(tftypes.Number, 101),
+						},
+					),
+				},
+			),
+
+			"regular_attribute": tftypes.NewValue(tftypes.String, "this is regular string"),
+			"dynamic_attribute": tftypes.NewValue(tftypes.String, "this is dynamic string"),
+		}),
+	)
+
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(state)
 
 	return &tfprotov5.ReadDataSourceResponse{
 		State: &state,

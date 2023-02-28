@@ -39,7 +39,7 @@ func main() {
 	}
 
 	err = tf5server.Serve(
-		"enciso.io/enciso/enciso",
+		"company.io/namespace/provider",
 		muxServer.ProviderServer,
 		serveOpts...,
 	)
